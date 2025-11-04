@@ -1,3 +1,7 @@
 <resources>
-    <string name="app_name">MitosBooking</string>
+    <string name="app_name">ShareMyBook</string>
+    <string name="title_activity_scanner">Scanner un livre</string>
+    <string name="title_activity_profile">Mon profil</string>
+    <string name="title_activity_transaction">Transaction</string>
+    <string name="title_activity_accept_transaction">Accepter la transaction</string>
 </resources>
