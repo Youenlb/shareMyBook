@@ -203,8 +203,9 @@ fun MyLoansScreen(viewModel: MyLibraryViewModel, modifier: Modifier = Modifier) 
                 onLoanClick = { },
                 onReturnClick = {
                     // Le prêteur génère le QR code pour le retour
-                    val intent = Intent(context, ConfirmReturnActivity::class.java).apply {
-                        putExtra("bookUid", book.uid)
+                    val intent = Intent(context, TransactionActivity::class.java).apply {
+                        putExtra("bookId", book.uid)
+                        putExtra("action", "RETURN")
                     }
                     context.startActivity(intent)
                 },

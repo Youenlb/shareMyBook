@@ -89,22 +89,33 @@ fun AcceptTransactionScreen(viewModel: AcceptTransactionViewModel, modifier: Mod
         } else if (errorMessage != null) {
             Text("Erreur: ${errorMessage}")
         } else if (transactionAccepted) {
-            Text("Transaction acceptée avec succès !")
-            // You might want to navigate away or show more details here
+            val message = if (transactionData?.action == "RETURN") {
+                "Retour confirmé avec succès !"
+            } else {
+                "Transaction acceptée avec succès !"
+            }
+            Text(message)
         } else if (transactionData != null) {
             val book = transactionData!!.book
             val owner = transactionData!!.owner
+            val action = transactionData!!.action
+
             Text("Livre : ${book.title}")
             Text("Propriétaire : ${owner.fullName}")
             Text("ISBN : ${book.isbn}")
-            // Display other book/owner details as needed
+
+            val buttonText = if (action == "RETURN") {
+                "Confirmer le retour"
+            } else {
+                "Confirmer l'emprunt"
+            }
 
             Button(
                 onClick = { viewModel.acceptTransaction() },
                 modifier = Modifier.padding(top = 16.dp),
-                enabled = !isLoading // Disable button while loading
+                enabled = !isLoading
             ) {
-                Text("Confirmer l'emprunt")
+                Text(buttonText)
             }
         } else {
             Text("Initialisation de la transaction...")

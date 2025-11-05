@@ -71,6 +71,7 @@ fun TransactionScreen(viewModel: TransactionViewModel, modifier: Modifier = Modi
     val shareId by viewModel.shareId.collectAsState()
     val transactionResult by viewModel.transactionResult.collectAsState()
     val errorMessage by viewModel.errorMessage.collectAsState()
+    val action by viewModel.action.collectAsState()
 
     Column(
         modifier = modifier.fillMaxSize(),
@@ -80,9 +81,18 @@ fun TransactionScreen(viewModel: TransactionViewModel, modifier: Modifier = Modi
         if (errorMessage != null) {
             Text("Erreur: ${errorMessage}")
         } else if (transactionResult != null) {
-            Text("Transaction terminée !")
+            val successMessage = if (action == "RETURN") {
+                "Retour terminé !"
+            } else {
+                "Transaction terminée !"
+            }
+            Text(successMessage)
             Text("Livre : ${transactionResult!!.book.title}")
-            Text("Prêté à : ${transactionResult!!.borrower?.fullName}")
+            if (action == "RETURN") {
+                Text("Livre retourné et disponible à nouveau")
+            } else {
+                Text("Prêté à : ${transactionResult!!.borrower?.fullName}")
+            }
         } else if (shareId != null) {
             val json = Gson().toJson(ShareIdQrCode(shareId!!))
             val bitmap: Bitmap = QRCode.from(json).withSize(1024, 1024).bitmap()
@@ -91,7 +101,12 @@ fun TransactionScreen(viewModel: TransactionViewModel, modifier: Modifier = Modi
                 contentDescription = "QR Code",
                 modifier = Modifier.size(256.dp)
             )
-            Text("En attente du scan de l'emprunteur...")
+            val waitingMessage = if (action == "RETURN") {
+                "En attente du scan de l'emprunteur pour confirmer le retour..."
+            } else {
+                "En attente du scan de l'emprunteur..."
+            }
+            Text(waitingMessage)
         } else {
             Text("Génération de la transaction...")
         }

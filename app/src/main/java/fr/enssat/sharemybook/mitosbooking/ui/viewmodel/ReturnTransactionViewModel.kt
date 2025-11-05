@@ -1,6 +1,7 @@
 package fr.enssat.sharemybook.mitosbooking.ui.viewmodel
 
 import android.content.SharedPreferences
+import android.util.Log
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
@@ -63,13 +64,11 @@ class ReturnTransactionViewModel @Inject constructor(
                     return@launch
                 }
 
-                // L'emprunteur confirme le retour
-                // On efface borrowerId et lenderId
-                val updatedBook = currentBook.copy(borrowerId = null, lenderId = null)
-                bookRepository.updateBook(updatedBook)
+                // Note: Ce ViewModel n'est plus utilisé dans la nouvelle architecture
+                // qui utilise TransactionActivity avec AcceptTransactionViewModel pour les retours
 
                 // Supprimer le livre de la base locale de l'emprunteur
-                bookRepository.deleteBook(updatedBook)
+                bookRepository.deleteBook(currentBook)
 
                 _transactionCompleted.value = true
             } catch (e: Exception) {

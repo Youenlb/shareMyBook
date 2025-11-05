@@ -63,25 +63,35 @@ class ConfirmReturnViewModel @Inject constructor(
 
     private fun pollForReturnConfirmation(bookUid: String) {
         viewModelScope.launch {
-            while (!_returnConfirmed.value) {
+            var pollCount = 0
+            val maxPollAttempts = 60 // Maximum 2 minutes (60 * 2 secondes)
+
+            while (!_returnConfirmed.value && pollCount < maxPollAttempts) {
                 try {
                     kotlinx.coroutines.delay(2000) // Attendre 2 secondes entre chaque vérification
+                    pollCount++
 
-                    // Vérifier si le livre a été mis à jour (borrowerId == null signifie retourné)
+                    // Note: Ce ViewModel n'est plus utilisé dans la nouvelle architecture
+                    // qui utilise TransactionActivity pour les retours
+                    // Vérifier la base locale (pour compatibilité)
                     val updatedBook = bookRepository.getBookById(bookUid).first()
 
+                    // Si le livre n'a plus de borrower, c'est qu'il a été retourné
                     if (updatedBook.borrowerId == null) {
-                        // L'emprunteur a confirmé le retour !
-                        // On efface aussi le lenderId pour rendre le livre disponible
-                        val availableBook = updatedBook.copy(lenderId = null)
-                        bookRepository.updateBook(availableBook)
+                        // Le livre a été retourné !
+                        _book.value = updatedBook
                         _returnConfirmed.value = true
+                        android.util.Log.d("ConfirmReturnViewModel", "Livre retourné avec succès")
                         break
                     }
                 } catch (e: Exception) {
-                    _errorMessage.value = "Erreur lors de la vérification du retour: ${e.localizedMessage}"
-                    break
+                    android.util.Log.e("ConfirmReturnViewModel", "Erreur lors du polling", e)
+                    // Continue le polling même en cas d'erreur
                 }
+            }
+
+            if (pollCount >= maxPollAttempts && !_returnConfirmed.value) {
+                _errorMessage.value = "Délai d'attente dépassé. Veuillez réessayer."
             }
         }
     }

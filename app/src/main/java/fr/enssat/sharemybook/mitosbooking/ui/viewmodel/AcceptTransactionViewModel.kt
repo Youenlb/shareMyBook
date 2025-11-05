@@ -65,14 +65,26 @@ class AcceptTransactionViewModel @Inject constructor(
                     _transactionData.value = transaction
                     _transactionAccepted.value = true
 
-                    // Add book and owner to local database
-                    // borrowerId = moi (celui qui emprunte)
-                    // lenderId = le propriétaire du livre
-                    bookRepository.insertBook(transaction.book.copy(
-                        borrowerId = userId,
-                        lenderId = transaction.owner.uid
-                    ))
-                    bookRepository.insertUser(transaction.owner)
+                    if (transaction.action == "LOAN") {
+                        // LOAN: Add book and owner to local database
+                        // borrowerId = moi (celui qui emprunte)
+                        // lenderId = le propriétaire du livre
+                        bookRepository.insertBook(transaction.book.copy(
+                            borrowerId = userId,
+                            lenderId = transaction.owner.uid
+                        ))
+                        bookRepository.insertUser(transaction.owner)
+                    } else if (transaction.action == "RETURN") {
+                        // RETURN: Delete book from borrower's local database
+                        // Le livre appartient au prêteur, l'emprunteur le supprime
+                        try {
+                            val localBook = bookRepository.getBookById(transaction.book.uid).first()
+                            bookRepository.deleteBook(localBook)
+                        } catch (e: Exception) {
+                            // Book might not exist locally, that's OK
+                            android.util.Log.d("AcceptTransactionViewModel", "Book not found locally for deletion: ${e.localizedMessage}")
+                        }
+                    }
                 } else {
                     _errorMessage.value = "User ID non trouvé."
                 }

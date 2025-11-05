@@ -95,7 +95,7 @@ class ScannerActivity : ComponentActivity() {
     private fun handleQrCodeScan(qrCodeContent: String) {
         val gson = Gson()
         try {
-            // Try to parse as ShareIdQrCode (for loan)
+            // Try to parse as ShareIdQrCode (for both loan and return)
             val shareIdQrCode = gson.fromJson(qrCodeContent, ShareIdQrCode::class.java)
             if (shareIdQrCode?.shareId != null) {
                 val intent = Intent(this, AcceptTransactionActivity::class.java).apply {
@@ -106,29 +106,10 @@ class ScannerActivity : ComponentActivity() {
                 return
             }
         } catch (e: Exception) {
-            // Not a ShareIdQrCode, try next
             Log.d("ScannerActivity", "Not a ShareIdQrCode: ${e.localizedMessage}")
         }
 
-        try {
-            // Try to parse as ReturnQrCode (for return)
-            val returnQrCode = gson.fromJson(qrCodeContent, ReturnQrCode::class.java)
-            if (returnQrCode != null) {
-                // L'emprunteur scanne le QR code généré par le prêteur
-                val intent = Intent(this, ReturnTransactionActivity::class.java).apply {
-                    putExtra("bookId", returnQrCode.bookUid)
-                }
-                startActivity(intent)
-                finish()
-                return
-            }
-        } catch (e: Exception) {
-            // Not a ReturnQrCode
-            Log.d("ScannerActivity", "Not a ReturnQrCode: ${e.localizedMessage}")
-        }
-
         Toast.makeText(this, "QR Code non reconnu ou format invalide.", Toast.LENGTH_SHORT).show()
-        // Optionally, you might want to return a result to the calling activity indicating failure
         setResult(RESULT_CANCELED)
         finish()
     }
@@ -145,6 +126,7 @@ fun CameraPreview(onBarcodeScanned: (String, Boolean) -> Unit) {
     val lifecycleOwner = LocalLifecycleOwner.current
     val cameraProviderFuture = remember { ProcessCameraProvider.getInstance(context) }
     val previewView = remember { PreviewView(context) }
+    val barcodeAnalyzer = remember { BarcodeAnalyzer(onBarcodeScanned) }
 
     AndroidView(
         factory = { previewView },
@@ -158,7 +140,7 @@ fun CameraPreview(onBarcodeScanned: (String, Boolean) -> Unit) {
                 .setBackpressureStrategy(ImageAnalysis.STRATEGY_KEEP_ONLY_LATEST)
                 .build()
                 .also {
-                    it.setAnalyzer(ContextCompat.getMainExecutor(context), BarcodeAnalyzer(onBarcodeScanned))
+                    it.setAnalyzer(ContextCompat.getMainExecutor(context), barcodeAnalyzer)
                 }
 
             try {
@@ -172,6 +154,9 @@ fun CameraPreview(onBarcodeScanned: (String, Boolean) -> Unit) {
             } catch (exc: Exception) {
                 Log.e("ScannerActivity", "Use case binding failed", exc)
             }
+        },
+        onRelease = {
+            barcodeAnalyzer.close()
         }
     )
 }
@@ -186,32 +171,43 @@ class BarcodeAnalyzer(private val onBarcodeScanned: (String, Boolean) -> Unit) :
         .build()
 
     private val scanner = BarcodeScanning.getClient(options)
+    @Volatile
+    private var isScanning = true
 
     @androidx.annotation.OptIn(androidx.camera.core.ExperimentalGetImage::class)
     override fun analyze(imageProxy: ImageProxy) {
         val mediaImage = imageProxy.image
-        if (mediaImage != null) {
+        if (mediaImage != null && isScanning) {
             val image = InputImage.fromMediaImage(mediaImage, imageProxy.imageInfo.rotationDegrees)
 
             scanner.process(image)
                 .addOnSuccessListener { barcodes ->
-                    if (barcodes.isNotEmpty()) {
+                    if (isScanning && barcodes.isNotEmpty()) {
                         for (barcode in barcodes) {
                             val rawValue = barcode.rawValue
                             if (rawValue != null) {
+                                isScanning = false
                                 onBarcodeScanned(rawValue, barcode.format == Barcode.FORMAT_QR_CODE)
-                                scanner.close()
                                 return@addOnSuccessListener
                             }
                         }
                     }
                 }
                 .addOnFailureListener { 
-                    Log.e("BarcodeAnalyzer", "Barcode scanning failed", it)
+                    if (isScanning) {
+                        Log.e("BarcodeAnalyzer", "Barcode scanning failed", it)
+                    }
                 }
                 .addOnCompleteListener {
                     imageProxy.close()
                 }
+        } else {
+            imageProxy.close()
         }
+    }
+
+    fun close() {
+        isScanning = false
+        scanner.close()
     }
 }

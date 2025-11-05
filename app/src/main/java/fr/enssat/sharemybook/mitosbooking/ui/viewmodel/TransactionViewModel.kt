@@ -22,7 +22,10 @@ class TransactionViewModel @Inject constructor(
 ) : ViewModel() {
 
     private val bookId: String = savedStateHandle.get<String>("bookId")!!
-    private val action: String = savedStateHandle.get<String>("action")!!
+    private val actionString: String = savedStateHandle.get<String>("action")!!
+
+    private val _action = MutableStateFlow(actionString)
+    val action: StateFlow<String> = _action
 
     private val _shareId = MutableStateFlow<String?>(null)
     val shareId: StateFlow<String?> = _shareId
@@ -43,20 +46,16 @@ class TransactionViewModel @Inject constructor(
             if (userId != null) {
                 try {
                     val user = bookRepository.getUserById(userId).first()
-                    if (user == null) {
-                        _errorMessage.value = "Profil utilisateur non trouvé. Veuillez configurer votre profil."
-                        return@launch
-                    }
 
                     val bookFromDb = bookRepository.getBookById(bookId).first()
 
-                    val bookToSend = if (action == "RETURN") {
+                    val bookToSend = if (actionString == "RETURN") {
                         bookFromDb.copy(borrowerId = null) // Clear borrowerId for RETURN action
                     } else {
                         bookFromDb
                     }
 
-                    val id = bookRepository.initTransaction(bookToSend, user, action)
+                    val id = bookRepository.initTransaction(bookToSend, user, actionString)
                     _shareId.value = id
                     pollForResult(id)
                 } catch (e: Exception) {
@@ -73,19 +72,19 @@ class TransactionViewModel @Inject constructor(
             while (_transactionResult.value == null) {
                 try {
                     val result = bookRepository.resultTransaction(shareId)
-                    if (result.borrower != null) {
+                    if (actionString == "LOAN" && result.borrower != null) {
                         // LOAN: Borrower accepted, update local book and add borrower user
                         _transactionResult.value = result
                         val bookToUpdate = bookRepository.getBookById(result.book.uid).first()
                         bookRepository.updateBook(bookToUpdate.copy(borrowerId = result.borrower.uid))
                         bookRepository.insertUser(result.borrower)
                         break
-                    } else if (action == "RETURN" && result.book.borrowerId == null) {
-                        // RETURN: Backend confirmed return, clear borrowerId locally
+                    } else if (actionString == "RETURN" && result.book.borrowerId == null) {
+                        // RETURN: Borrower confirmed return via API, clear borrowerId and lenderId locally
                         _transactionResult.value = result
                         val bookToUpdate = bookRepository.getBookById(result.book.uid).first()
-                        bookRepository.updateBook(bookToUpdate.copy(borrowerId = null))
-                        // Optionally remove borrower user if no longer needed - for now, keep it.
+                        // Remettre le livre disponible (pas de borrower, pas de lender)
+                        bookRepository.updateBook(bookToUpdate.copy(borrowerId = null, lenderId = null))
                         break
                     }
                 } catch (e: Exception) {
