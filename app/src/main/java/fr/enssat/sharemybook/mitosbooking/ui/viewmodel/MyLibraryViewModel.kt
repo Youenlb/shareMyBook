@@ -1,19 +1,16 @@
 package fr.enssat.sharemybook.mitosbooking.ui.viewmodel
 
-import android.app.Application
-import android.content.SharedPreferences
-import android.widget.Toast
+import android.content.Context
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.enssat.sharemybook.mitosbooking.data.entity.Book
-import fr.enssat.sharemybook.mitosbooking.data.entity.User
 import fr.enssat.sharemybook.mitosbooking.data.repository.BookRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
-import kotlinx.coroutines.flow.combine
 import kotlinx.coroutines.flow.first
 import kotlinx.coroutines.flow.map
 import kotlinx.coroutines.flow.stateIn
@@ -24,10 +21,10 @@ import javax.inject.Inject
 @HiltViewModel
 class MyLibraryViewModel @Inject constructor(
     private val bookRepository: BookRepository,
-    private val sharedPreferences: SharedPreferences,
-    private val application: Application
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
+    private val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
     private val currentUserId: String = sharedPreferences.getString("user_id", null)
         ?: UUID.randomUUID().toString().also { sharedPreferences.edit().putString("user_id", it).apply() }
 

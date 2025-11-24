@@ -1,9 +1,12 @@
 package fr.enssat.sharemybook.mitosbooking.ui.viewmodel
 
-import android.content.SharedPreferences
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.enssat.sharemybook.mitosbooking.data.entity.Book
 import fr.enssat.sharemybook.mitosbooking.data.entity.User
 import fr.enssat.sharemybook.mitosbooking.data.repository.BookRepository
@@ -16,7 +19,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ConfirmReturnViewModel @Inject constructor(
     private val bookRepository: BookRepository,
-    private val sharedPreferences: SharedPreferences
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _book = MutableStateFlow<Book?>(null)
@@ -51,10 +54,15 @@ class ConfirmReturnViewModel @Inject constructor(
                     // Lancer le polling pour détecter quand l'emprunteur confirme le retour
                     pollForReturnConfirmation(bookUid)
                 } else {
-                    _errorMessage.value = "Ce livre n'a pas d'emprunteur"
+                    val errorMsg = "Ce livre n'a pas d'emprunteur"
+                    _errorMessage.value = errorMsg
+                    showToast(errorMsg)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Erreur lors du chargement des données de retour: ${e.localizedMessage}"
+                val errorMsg = "Erreur lors du chargement des données de retour: ${e.localizedMessage}"
+                _errorMessage.value = errorMsg
+                showToast(errorMsg)
+                Log.e("ConfirmReturnViewModel", "Erreur loadReturnData", e)
             } finally {
                 _isLoading.value = false
             }
@@ -81,18 +89,27 @@ class ConfirmReturnViewModel @Inject constructor(
                         // Le livre a été retourné !
                         _book.value = updatedBook
                         _returnConfirmed.value = true
-                        android.util.Log.d("ConfirmReturnViewModel", "Livre retourné avec succès")
+                        showToast("Livre retourné avec succès")
+                        Log.d("ConfirmReturnViewModel", "Livre retourné avec succès")
                         break
                     }
                 } catch (e: Exception) {
-                    android.util.Log.e("ConfirmReturnViewModel", "Erreur lors du polling", e)
+                    Log.e("ConfirmReturnViewModel", "Erreur lors du polling", e)
                     // Continue le polling même en cas d'erreur
                 }
             }
 
             if (pollCount >= maxPollAttempts && !_returnConfirmed.value) {
-                _errorMessage.value = "Délai d'attente dépassé. Veuillez réessayer."
+                val errorMsg = "Délai d'attente dépassé. Veuillez réessayer."
+                _errorMessage.value = errorMsg
+                showToast(errorMsg)
             }
+        }
+    }
+
+    private fun showToast(message: String) {
+        viewModelScope.launch {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
 }

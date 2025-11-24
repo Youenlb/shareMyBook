@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "608822121717",
+    "project_id": "sharemybook-30d42",
+    "storage_bucket": "sharemybook-30d42.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:608822121717:android:aa9a573c89f3889c8421bc",
+        "android_client_info": {
+          "package_name": "fr.enssat.sharemybook.mitosbooking"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyBD8UMqkFHs0_s75j8gDL1JiewHhpKuA3I"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

@@ -1,13 +1,13 @@
 package fr.enssat.sharemybook.mitosbooking.ui.viewmodel
 
-import android.content.SharedPreferences
+import android.content.Context
 import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
-import fr.enssat.sharemybook.mitosbooking.data.remote.ReturnQrCode
+import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.enssat.sharemybook.mitosbooking.data.repository.BookRepository
-import kotlinx.coroutines.delay
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
 import kotlinx.coroutines.flow.first
@@ -17,7 +17,7 @@ import javax.inject.Inject
 @HiltViewModel
 class ReturnTransactionViewModel @Inject constructor(
     private val bookRepository: BookRepository,
-    private val sharedPreferences: SharedPreferences
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
 
     private val _book = MutableStateFlow<fr.enssat.sharemybook.mitosbooking.data.entity.Book?>(null)
@@ -32,6 +32,12 @@ class ReturnTransactionViewModel @Inject constructor(
     private val _isLoading = MutableStateFlow(false)
     val isLoading: StateFlow<Boolean> = _isLoading
 
+    private fun showToast(message: String) {
+        viewModelScope.launch {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
+        }
+    }
+
     fun initiateReturn(bookId: String) {
         viewModelScope.launch {
             _errorMessage.value = null
@@ -40,7 +46,10 @@ class ReturnTransactionViewModel @Inject constructor(
                 val loadedBook = bookRepository.getBookById(bookId).first()
                 _book.value = loadedBook
             } catch (e: Exception) {
-                _errorMessage.value = "Erreur lors du chargement du livre: ${e.localizedMessage}"
+                val errorMsg = "Erreur lors du chargement du livre: ${e.localizedMessage}"
+                _errorMessage.value = errorMsg
+                showToast(errorMsg)
+                Log.e("ReturnTransactionViewModel", "Erreur initiateReturn", e)
             } finally {
                 _isLoading.value = false
             }
@@ -54,13 +63,19 @@ class ReturnTransactionViewModel @Inject constructor(
             try {
                 val currentBook = _book.value
                 if (currentBook == null) {
-                    _errorMessage.value = "Livre non trouvé"
+                    val errorMsg = "Livre non trouvé"
+                    _errorMessage.value = errorMsg
+                    showToast(errorMsg)
                     return@launch
                 }
 
+                // Récupérer l'ID utilisateur via SharedPreferences
+                val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
                 val currentUserUid = sharedPreferences.getString("user_id", null)
                 if (currentUserUid == null) {
-                    _errorMessage.value = "User ID non trouvé."
+                    val errorMsg = "User ID non trouvé."
+                    _errorMessage.value = errorMsg
+                    showToast(errorMsg)
                     return@launch
                 }
 
@@ -71,8 +86,12 @@ class ReturnTransactionViewModel @Inject constructor(
                 bookRepository.deleteBook(currentBook)
 
                 _transactionCompleted.value = true
+                showToast("Livre retourné avec succès!")
             } catch (e: Exception) {
-                _errorMessage.value = "Erreur lors de la confirmation du retour: ${e.localizedMessage}"
+                val errorMsg = "Erreur lors de la confirmation du retour: ${e.localizedMessage}"
+                _errorMessage.value = errorMsg
+                showToast(errorMsg)
+                Log.e("ReturnTransactionViewModel", "Erreur confirmReturn", e)
             } finally {
                 _isLoading.value = false
             }

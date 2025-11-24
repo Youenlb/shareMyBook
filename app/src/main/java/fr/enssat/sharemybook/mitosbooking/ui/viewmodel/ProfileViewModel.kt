@@ -1,10 +1,11 @@
 package fr.enssat.sharemybook.mitosbooking.ui.viewmodel
 
-import android.content.SharedPreferences
+import android.content.Context
 import androidx.core.content.edit
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.enssat.sharemybook.mitosbooking.data.entity.User
 import fr.enssat.sharemybook.mitosbooking.data.repository.BookRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,8 +17,10 @@ import javax.inject.Inject
 @HiltViewModel
 class ProfileViewModel @Inject constructor(
     private val bookRepository: BookRepository,
-    private val sharedPreferences: SharedPreferences
+    @ApplicationContext private val context: Context
 ) : ViewModel() {
+
+    private val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
 
     private val _user = MutableStateFlow<User?>(null)
     val user: StateFlow<User?> = _user

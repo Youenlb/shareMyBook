@@ -1,10 +1,13 @@
 package fr.enssat.sharemybook.mitosbooking.ui.viewmodel
 
-import android.content.SharedPreferences
+import android.content.Context
+import android.util.Log
+import android.widget.Toast
 import androidx.lifecycle.SavedStateHandle
 import androidx.lifecycle.ViewModel
 import androidx.lifecycle.viewModelScope
 import dagger.hilt.android.lifecycle.HiltViewModel
+import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.enssat.sharemybook.mitosbooking.data.remote.TransactionData
 import fr.enssat.sharemybook.mitosbooking.data.repository.BookRepository
 import kotlinx.coroutines.flow.MutableStateFlow
@@ -16,7 +19,7 @@ import javax.inject.Inject
 @HiltViewModel
 class AcceptTransactionViewModel @Inject constructor(
     private val bookRepository: BookRepository,
-    private val sharedPreferences: SharedPreferences,
+    @ApplicationContext private val context: Context,
     savedStateHandle: SavedStateHandle
 ) : ViewModel() {
 
@@ -46,7 +49,10 @@ class AcceptTransactionViewModel @Inject constructor(
                 val result = bookRepository.resultTransaction(shareId)
                 _transactionData.value = result
             } catch (e: Exception) {
-                _errorMessage.value = "Erreur lors du chargement de la transaction: ${e.localizedMessage}"
+                val errorMsg = "Erreur lors du chargement de la transaction: ${e.localizedMessage}"
+                _errorMessage.value = errorMsg
+                showToast(errorMsg)
+                Log.e("AcceptTransactionViewModel", "Erreur loadTransaction", e)
             } finally {
                 _isLoading.value = false
             }
@@ -58,12 +64,25 @@ class AcceptTransactionViewModel @Inject constructor(
             _isLoading.value = true
             _errorMessage.value = null
             try {
+                val sharedPreferences = context.getSharedPreferences("user_prefs", Context.MODE_PRIVATE)
                 val userId = sharedPreferences.getString("user_id", null)
                 if (userId != null) {
                     val user = bookRepository.getUserById(userId).first()
+
+                    // Vérifier que l'utilisateur a complété son profil
+                    if (user.fullName.isEmpty() || user.tel.isEmpty() || user.email.isEmpty()) {
+                        val errorMsg = "Veuillez compléter votre profil (nom, téléphone, email) avant d'accepter une transaction"
+                        _errorMessage.value = errorMsg
+                        showToast(errorMsg)
+                        Log.w("AcceptTransactionViewModel", "Profil utilisateur incomplet")
+                        _isLoading.value = false
+                        return@launch
+                    }
+
                     val transaction = bookRepository.acceptTransaction(shareId, user)
                     _transactionData.value = transaction
                     _transactionAccepted.value = true
+                    showToast("Transaction acceptée!")
 
                     if (transaction.action == "LOAN") {
                         // LOAN: Add book and owner to local database
@@ -82,17 +101,28 @@ class AcceptTransactionViewModel @Inject constructor(
                             bookRepository.deleteBook(localBook)
                         } catch (e: Exception) {
                             // Book might not exist locally, that's OK
-                            android.util.Log.d("AcceptTransactionViewModel", "Book not found locally for deletion: ${e.localizedMessage}")
+                            Log.d("AcceptTransactionViewModel", "Book not found locally for deletion: ${e.localizedMessage}")
                         }
                     }
                 } else {
-                    _errorMessage.value = "User ID non trouvé."
+                    val errorMsg = "User ID non trouvé."
+                    _errorMessage.value = errorMsg
+                    showToast(errorMsg)
                 }
             } catch (e: Exception) {
-                _errorMessage.value = "Erreur lors de l'acceptation de la transaction: ${e.localizedMessage}"
+                val errorMsg = "Erreur lors de l'acceptation de la transaction: ${e.localizedMessage}"
+                _errorMessage.value = errorMsg
+                showToast(errorMsg)
+                Log.e("AcceptTransactionViewModel", "Erreur acceptTransaction", e)
             } finally {
                 _isLoading.value = false
             }
+        }
+    }
+
+    private fun showToast(message: String) {
+        viewModelScope.launch {
+            Toast.makeText(context, message, Toast.LENGTH_LONG).show()
         }
     }
 }
