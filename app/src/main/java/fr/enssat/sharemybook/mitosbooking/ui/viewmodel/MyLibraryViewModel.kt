@@ -8,6 +8,7 @@ import dagger.hilt.android.qualifiers.ApplicationContext
 import fr.enssat.sharemybook.mitosbooking.data.entity.Book
 import fr.enssat.sharemybook.mitosbooking.data.repository.BookRepository
 import kotlinx.coroutines.flow.MutableSharedFlow
+import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.asSharedFlow
 import kotlinx.coroutines.flow.SharingStarted
 import kotlinx.coroutines.flow.StateFlow
@@ -30,6 +31,16 @@ class MyLibraryViewModel @Inject constructor(
 
     private val _toastMessages = MutableSharedFlow<String>()
     val toastMessages = _toastMessages.asSharedFlow()
+
+    // État du livre en attente de validation
+    private val _pendingBook = MutableStateFlow<Book?>(null)
+    val pendingBook: StateFlow<Book?> = _pendingBook
+
+    private val _isLoadingBook = MutableStateFlow(false)
+    val isLoadingBook: StateFlow<Boolean> = _isLoadingBook
+
+    private val _errorMessage = MutableStateFlow<String?>(null)
+    val errorMessage: StateFlow<String?> = _errorMessage
 
     val books: StateFlow<List<Book>> = bookRepository.getAllBooks()
         .stateIn(
@@ -113,18 +124,49 @@ class MyLibraryViewModel @Inject constructor(
 
     fun onIsbnScanned(isbn: String) {
         viewModelScope.launch {
+            _errorMessage.value = null
+            _isLoadingBook.value = true
             try {
                 val book = bookRepository.getBookDetailsFromApi(isbn)
                 if (book != null) {
-                    bookRepository.insertBook(book.copy(lenderId = null)) // Ensure newly added books are not marked as borrowed
-                    _toastMessages.emit("Livre ajouté à votre bibliothèque !")
+                    // Afficher le livre en attente de validation
+                    _pendingBook.value = book.copy(lenderId = null)
+                    _toastMessages.emit("Veuillez confirmer l'ajout du livre")
                 } else {
-                    _toastMessages.emit("Livre non trouvé.")
+                    val errorMsg = "Livre non trouvé. Veuillez vérifier l'ISBN."
+                    _errorMessage.value = errorMsg
+                    _toastMessages.emit(errorMsg)
                 }
             } catch (e: Exception) {
-                _toastMessages.emit("Erreur lors de la récupération du livre.")
+                val errorMsg = "Erreur lors de la récupération du livre : ${e.localizedMessage}"
+                _errorMessage.value = errorMsg
+                _toastMessages.emit(errorMsg)
+            } finally {
+                _isLoadingBook.value = false
             }
         }
+    }
+
+    fun confirmAddBook() {
+        val book = _pendingBook.value
+        if (book != null) {
+            viewModelScope.launch {
+                try {
+                    bookRepository.insertBook(book)
+                    _toastMessages.emit("Livre ajouté à votre bibliothèque !")
+                    _pendingBook.value = null
+                } catch (e: Exception) {
+                    val errorMsg = "Erreur lors de l'ajout du livre : ${e.localizedMessage}"
+                    _errorMessage.value = errorMsg
+                    _toastMessages.emit(errorMsg)
+                }
+            }
+        }
+    }
+
+    fun cancelAddBook() {
+        _pendingBook.value = null
+        _errorMessage.value = null
     }
 
     // Helper function to get a user by ID and handle potential null values

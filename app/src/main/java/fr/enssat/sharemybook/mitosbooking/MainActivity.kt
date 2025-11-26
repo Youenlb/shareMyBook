@@ -37,6 +37,8 @@ import androidx.compose.material3.NavigationBarItem
 import androidx.compose.material3.Scaffold
 import androidx.compose.material3.Text
 import androidx.compose.material3.TopAppBar
+import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.CircularProgressIndicator
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
@@ -81,6 +83,20 @@ class MainActivity : ComponentActivity() {
                         Toast.makeText(context, message, Toast.LENGTH_SHORT).show()
                     }
                 }
+
+                // Dialog de validation du livre scanné
+                val pendingBook by viewModel.pendingBook.collectAsState()
+                val isLoadingBook by viewModel.isLoadingBook.collectAsState()
+
+                if (pendingBook != null) {
+                    BookValidationDialog(
+                        book = pendingBook!!,
+                        isLoading = isLoadingBook,
+                        onConfirm = { viewModel.confirmAddBook() },
+                        onCancel = { viewModel.cancelAddBook() }
+                    )
+                }
+
                 Scaffold(
                     modifier = Modifier.fillMaxSize(),
                     topBar = {
@@ -354,3 +370,101 @@ fun BookItem(
     }
 }
 
+@Composable
+fun BookValidationDialog(
+    book: Book,
+    isLoading: Boolean,
+    onConfirm: () -> Unit,
+    onCancel: () -> Unit
+) {
+    AlertDialog(
+        onDismissRequest = onCancel,
+        title = {
+            Text("Confirmer l'ajout du livre")
+        },
+        text = {
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(8.dp)
+            ) {
+                if (isLoading) {
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(16.dp),
+                        horizontalArrangement = Arrangement.Center
+                    ) {
+                        CircularProgressIndicator()
+                    }
+                    Text("Chargement des informations du livre...")
+                } else {
+                    // Afficher l'image de couverture si disponible
+                    book.covers?.let { covers ->
+                        if (covers.isNotEmpty()) {
+                            Image(
+                                painter = rememberAsyncImagePainter(model = covers),
+                                contentDescription = "Couverture",
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .padding(bottom = 8.dp)
+                                    .size(120.dp),
+                                contentScale = ContentScale.Crop
+                            )
+                        }
+                    }
+
+                    // Titre
+                    Text(
+                        text = book.title,
+                        style = MaterialTheme.typography.titleMedium,
+                        modifier = Modifier.padding(bottom = 4.dp)
+                    )
+
+                    // Auteurs
+                    book.authors?.let { authors ->
+                        if (authors.isNotEmpty()) {
+                            Text(
+                                text = "Auteurs: $authors",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(bottom = 4.dp)
+                            )
+                        }
+                    }
+
+                    // ISBN
+                    book.isbn?.let { isbn ->
+                        if (isbn.isNotEmpty()) {
+                            Text(
+                                text = "ISBN: $isbn",
+                                style = MaterialTheme.typography.bodySmall,
+                                modifier = Modifier.padding(bottom = 8.dp)
+                            )
+                        }
+                    }
+
+                    Text(
+                        text = "Voulez-vous ajouter ce livre à votre bibliothèque ?",
+                        style = MaterialTheme.typography.bodyMedium
+                    )
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = onConfirm,
+                enabled = !isLoading
+            ) {
+                Text("Ajouter")
+            }
+        },
+        dismissButton = {
+            Button(
+                onClick = onCancel,
+                enabled = !isLoading
+            ) {
+                Text("Annuler")
+            }
+        }
+    )
+}
